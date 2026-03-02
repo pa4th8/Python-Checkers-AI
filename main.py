@@ -6,6 +6,7 @@ from minimax.algorithm import minimax
 
 FPS = 60
 
+pygame.init()
 WIN = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption('Checkers')
 
@@ -24,11 +25,20 @@ def main():
         clock.tick(FPS)
         
         if game.turn == WHITE:
-            value, new_board = minimax(game.get_board(), 4, WHITE, game)
+            value, new_board = minimax(game.get_board(), 4, WHITE, float('-inf'), float('inf'))
             game.ai_move(new_board)
 
         if game.winner() != None:
-            print(game.winner())
+            winner = game.winner()
+            if winner == RED:
+                msg = "RED Wins!"
+            else:
+                msg = "WHITE Wins!"
+            font = pygame.font.SysFont(None, 72)
+            text = font.render(msg, True, winner, (0, 0, 0))
+            WIN.blit(text, (WIDTH // 2 - text.get_width() // 2, HEIGHT // 2 - text.get_height() // 2))
+            pygame.display.update()
+            pygame.time.delay(3000)
             run = False
 
         for event in pygame.event.get():
