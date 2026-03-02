@@ -13,10 +13,33 @@ class Board:
         win.fill(BLACK)
         for row in range(ROWS):
             for col in range(row % 2, COLS, 2):
-                pygame.draw.rect(win, RED, (row*SQUARE_SIZE, col *SQUARE_SIZE, SQUARE_SIZE, SQUARE_SIZE))
+                pygame.draw.rect(win, RED, (col * SQUARE_SIZE, row * SQUARE_SIZE, SQUARE_SIZE, SQUARE_SIZE))
 
     def evaluate(self):
-        return self.white_left - self.red_left + (self.white_kings * 0.5 - self.red_kings * 0.5)
+        score = 0
+        for row in range(ROWS):
+            for col in range(COLS):
+                piece = self.board[row][col]
+                if piece != 0:
+                    # Base piece value
+                    value = 1
+                    # Kings get a higher weight
+                    if piece.king:
+                        value += 1.5
+                    else:
+                        # Positional bonus: reward advancement toward promotion row
+                        if piece.color == WHITE:
+                            value += (row / (ROWS - 1)) * 0.5
+                        else:
+                            value += ((ROWS - 1 - row) / (ROWS - 1)) * 0.5
+                    # Center control bonus: columns 2-5 are central
+                    if 2 <= col <= 5:
+                        value += 0.2
+                    if piece.color == WHITE:
+                        score += value
+                    else:
+                        score -= value
+        return score
 
     def get_all_pieces(self, color):
         pieces = []
@@ -31,11 +54,12 @@ class Board:
         piece.move(row, col)
 
         if row == ROWS - 1 or row == 0:
-            piece.make_king()
-            if piece.color == WHITE:
-                self.white_kings += 1
-            else:
-                self.red_kings += 1 
+            if not piece.king:
+                piece.make_king()
+                if piece.color == WHITE:
+                    self.white_kings += 1
+                else:
+                    self.red_kings += 1
 
     def get_piece(self, row, col):
         return self.board[row][col]
@@ -68,8 +92,12 @@ class Board:
             if piece != 0:
                 if piece.color == RED:
                     self.red_left -= 1
+                    if piece.king:
+                        self.red_kings -= 1
                 else:
                     self.white_left -= 1
+                    if piece.king:
+                        self.white_kings -= 1
     
     def winner(self):
         if self.red_left <= 0:
@@ -94,7 +122,9 @@ class Board:
     
         return moves
 
-    def _traverse_left(self, start, stop, step, color, left, skipped=[]):
+    def _traverse_left(self, start, stop, step, color, left, skipped=None):
+        if skipped is None:
+            skipped = []
         moves = {}
         last = []
         for r in range(start, stop, step):
@@ -127,7 +157,9 @@ class Board:
         
         return moves
 
-    def _traverse_right(self, start, stop, step, color, right, skipped=[]):
+    def _traverse_right(self, start, stop, step, color, right, skipped=None):
+        if skipped is None:
+            skipped = []
         moves = {}
         last = []
         for r in range(start, stop, step):
