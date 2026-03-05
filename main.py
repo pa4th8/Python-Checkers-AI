@@ -24,7 +24,7 @@ MENU_BG = (30, 30, 30)
 
 
 def draw_menu(win):
-    """Display the difficulty selection menu and return the chosen depth value."""
+    """Display the difficulty selection menu and return (depth, label) for the chosen difficulty."""
     title_font = pygame.font.SysFont(None, 80)
     subtitle_font = pygame.font.SysFont(None, 48)
     btn_font = pygame.font.SysFont(None, 44)
@@ -57,7 +57,8 @@ def draw_menu(win):
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 for i, rect in enumerate(button_rects):
                     if rect.collidepoint(mouse_pos):
-                        return DIFFICULTY_BUTTONS[i][1]  # return depth
+                        label, depth = DIFFICULTY_BUTTONS[i][0], DIFFICULTY_BUTTONS[i][1]
+                        return (depth, label)
 
         # Draw background
         win.fill(MENU_BG)
@@ -82,6 +83,97 @@ def draw_menu(win):
         pygame.display.update()
 
 
+def draw_game_over(win, winner_color, game, difficulty_label):
+    """Display the game-over screen and return 'menu' or 'quit'."""
+    clock = pygame.time.Clock()
+
+    winner_font = pygame.font.SysFont(None, 80)
+    stats_font = pygame.font.SysFont(None, 36)
+    btn_font = pygame.font.SysFont(None, 44)
+
+    # Determine winner text and color
+    if winner_color == RED:
+        winner_text = "RED Wins!"
+        text_color = RED
+    elif winner_color == WHITE:
+        winner_text = "WHITE Wins!"
+        text_color = WHITE
+    else:
+        winner_text = "It's a Draw!"
+        text_color = (255, 220, 0)
+
+    # Piece counts from the board
+    board = game.get_board()
+    red_pieces = board.red_left
+    white_pieces = board.white_left
+
+    stats_text = f"RED: {red_pieces} pieces  |  WHITE: {white_pieces} pieces"
+    diff_text = f"Difficulty: {difficulty_label}"
+
+    # Button definitions: (label, action, normal_color, hover_color)
+    GAMEOVER_BUTTONS = [
+        ("Play Again", "menu", (0, 180, 0),   (0, 220, 0)),
+        ("Quit",       "quit", (200, 0, 0),   (240, 0, 0)),
+    ]
+
+    btn_spacing = 20
+    total_btn_height = len(GAMEOVER_BUTTONS) * BUTTON_H + (len(GAMEOVER_BUTTONS) - 1) * btn_spacing
+    btn_start_y = HEIGHT // 2 + 80
+
+    button_rects = []
+    for i in range(len(GAMEOVER_BUTTONS)):
+        rect = pygame.Rect(
+            WIDTH // 2 - BUTTON_W // 2,
+            btn_start_y + i * (BUTTON_H + btn_spacing),
+            BUTTON_W,
+            BUTTON_H,
+        )
+        button_rects.append(rect)
+
+    # Semi-transparent overlay surface
+    overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+    overlay.fill((0, 0, 0, 180))
+
+    while True:
+        clock.tick(FPS)
+        mouse_pos = pygame.mouse.get_pos()
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                raise SystemExit
+
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                for i, rect in enumerate(button_rects):
+                    if rect.collidepoint(mouse_pos):
+                        return GAMEOVER_BUTTONS[i][1]  # return action string
+
+        # Draw overlay on top of whatever is already on the window
+        win.blit(overlay, (0, 0))
+
+        # Winner announcement
+        winner_surf = winner_font.render(winner_text, True, text_color)
+        win.blit(winner_surf, (WIDTH // 2 - winner_surf.get_width() // 2, HEIGHT // 2 - 160))
+
+        # Stats
+        stats_surf = stats_font.render(stats_text, True, (200, 200, 200))
+        win.blit(stats_surf, (WIDTH // 2 - stats_surf.get_width() // 2, HEIGHT // 2 - 60))
+
+        diff_surf = stats_font.render(diff_text, True, (200, 200, 200))
+        win.blit(diff_surf, (WIDTH // 2 - diff_surf.get_width() // 2, HEIGHT // 2 - 10))
+
+        # Buttons
+        for i, (label, action, color, hover_color) in enumerate(GAMEOVER_BUTTONS):
+            rect = button_rects[i]
+            current_color = hover_color if rect.collidepoint(mouse_pos) else color
+            pygame.draw.rect(win, current_color, rect, border_radius=8)
+            pygame.draw.rect(win, (255, 255, 255), rect, width=2, border_radius=8)
+            btn_surf = btn_font.render(label, True, (255, 255, 255))
+            win.blit(btn_surf, (rect.centerx - btn_surf.get_width() // 2, rect.centery - btn_surf.get_height() // 2))
+
+        pygame.display.update()
+
+
 def get_row_col_from_mouse(pos):
     x, y = pos
     row = y // SQUARE_SIZE
@@ -89,7 +181,7 @@ def get_row_col_from_mouse(pos):
     return row, col
 
 
-def main(depth):
+def main(depth, difficulty_label):
     run = True
     clock = pygame.time.Clock()
     game = Game(WIN)
@@ -103,16 +195,8 @@ def main(depth):
 
         if game.winner() != None:
             winner = game.winner()
-            if winner == RED:
-                msg = "RED Wins!"
-            else:
-                msg = "WHITE Wins!"
-            font = pygame.font.SysFont(None, 72)
-            text = font.render(msg, True, winner, (0, 0, 0))
-            WIN.blit(text, (WIDTH // 2 - text.get_width() // 2, HEIGHT // 2 - text.get_height() // 2))
-            pygame.display.update()
-            pygame.time.delay(3000)
-            run = False
+            game.update()
+            return draw_game_over(WIN, winner, game, difficulty_label)
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -128,5 +212,8 @@ def main(depth):
 
 
 while True:
-    selected_depth = draw_menu(WIN)
-    main(selected_depth)
+    selected_depth, difficulty_label = draw_menu(WIN)
+    result = main(selected_depth, difficulty_label)
+    if result == "quit":
+        pygame.quit()
+        raise SystemExit
